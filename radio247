@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Radio 247 - 90.3MHz</title>
+    <link rel="icon" href="https://i.imgur.com/aDdM2SR.png" type="image/png"> <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg-color: #042c55;
+            --player-bg-color: #ffffff0a;
+            --brand-orange: #f28b00;
+            --brand-cyan: #0dbbd2;
+            --accent-red: #eb3100;
+            --text-light: #ffffff;
+            --shadow-dark: rgba(0, 0, 0, 0.4);
+            --shadow-medium: rgba(0,0,0,0.3);
+            --shadow-light: rgba(0,0,0,0.5);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes equalize {
+            0%   { transform: scaleY(0.2); }
+            50%  { transform: scaleY(1); }
+            100% { transform: scaleY(0.2); }
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            10%, 90% { opacity: 1; }
+        }
+
+        .playing-animation {
+            animation: spin 4s linear infinite;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg-color);
+        }
+
+        .player-container {
+            background-color: var(--player-bg-color);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px var(--shadow-dark);
+            transition: transform 0.3s ease-in-out;
+            backdrop-filter: blur(5px); /* Added for a subtle frosted glass effect */
+        }
+
+        .player-container:hover {
+            transform: translateY(-5px);
+        }
+
+        .logo-container {
+            cursor: pointer;
+            border-radius: 50%;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.05);
+            transition: background-color 0.3s ease;
+            outline: none; /* Remove default focus outline */
+        }
+
+        .logo-container:hover, .logo-container:focus {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .logo-image {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            box-shadow: 0 4px 15px var(--shadow-medium);
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-light);
+            text-shadow: 1px 1px 2px var(--shadow-light);
+            min-height: 1.5rem; /* Prevent layout shift during text changes */
+        }
+
+        .title-text {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--brand-orange);
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+        }
+
+        .subtitle-text {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--brand-cyan);
+            min-height: 1.5625rem; /* Ensure consistent height for cycling text */
+            animation: fadeInOut 4s infinite; /* Animation for cycling text */
+        }
+
+        .equalizer {
+            display: none;
+            margin-top: 20px;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .equalizer.active {
+            display: flex;
+        }
+
+        .bar {
+            width: 6px;
+            height: 30px;
+            background: var(--accent-red);
+            border-radius: 4px;
+            animation: equalize 1s infinite ease-in-out;
+        }
+
+        .bar:nth-child(1) { animation-delay: 0s; }
+        .bar:nth-child(2) { animation-delay: 0.2s; }
+        .bar:nth-child(3) { animation-delay: 0.4s; }
+        .bar:nth-child(4) { animation-delay: 0.2s; }
+        .bar:nth-child(5) { animation-delay: 0s; }
+
+        @media (max-width: 640px) {
+            .logo-image { width: 120px; height: 120px; }
+            .title-text { font-size: 1.5rem; }
+            .status-text { font-size: 1rem; }
+            .subtitle-text { font-size: 1rem; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="player-container p-6 sm:p-8 md:p-10 text-center">
+        <h1 class="title-text mb-1">Radio 247</h1>
+        <p class="subtitle-text mb-6">
+            <span id="cyclingText"></span>
+        </p>
+
+        <audio id="audioPlayer" src="https://radio.localstreamgh.com/listen/radio247/radio.mp3" preload="auto"></audio>
+
+        <div id="logoContainer" class="logo-container inline-block mb-6" tabindex="0" role="button" aria-label="Play/Pause Radio">
+            <img id="logo" src="https://i.imgur.com/aDdM2SR.png" alt="Radio 247 Logo"
+                 class="logo-image"
+                 onerror="this.onerror=null; this.src='https://placehold.co/150x150/042c55/ffffff?text=Logo+Error';">
+        </div>
+
+        <p id="status" class="status-text">Click the logo to Play/Pause</p>
+        <p id="loadingStatus" class="status-text text-sm text-gray-400 mt-2 hidden">Loading stream...</p>
+        <div id="equalizer" class="equalizer">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const audioPlayer = document.getElementById('audioPlayer');
+            const logo = document.getElementById('logo');
+            const logoContainer = document.getElementById('logoContainer');
+            const statusText = document.getElementById('status');
+            const loadingStatusText = document.getElementById('loadingStatus');
+            const equalizer = document.getElementById('equalizer');
+            const cyclingTextElement = document.getElementById('cyclingText');
+            // Removed: const nowPlayingTextElement = document.getElementById('nowPlayingText');
+            let isPlaying = false;
+            let isLoading = false;
+
+            const cyclingTexts = [
+                "90.3 FM",
+                "Total Radio EveryDay",
+                "Kanda, Accra"
+            ];
+            let currentTextIndex = 0;
+
+            // Removed: const NOW_PLAYING_API_URL = '...';
+            // Removed: const NOW_PLAYING_POLL_INTERVAL = 10000;
+
+            // Function to update the cycling text
+            function updateCyclingText() {
+                cyclingTextElement.style.animation = 'none'; // Reset animation
+                void cyclingTextElement.offsetWidth; // Trigger reflow
+                cyclingTextElement.textContent = cyclingTexts[currentTextIndex];
+                cyclingTextElement.style.animation = 'fadeInOut 4s infinite'; // Reapply animation
+                currentTextIndex = (currentTextIndex + 1) % cyclingTexts.length;
+            }
+
+            // Removed: async function fetchNowPlaying() { ... }
+
+            // Initial calls and intervals
+            updateCyclingText();
+            setInterval(updateCyclingText, 4000); // Change text every 4 seconds
+
+            // Removed: fetchNowPlaying();
+            // Removed: setInterval(fetchNowPlaying, NOW_PLAYING_POLL_INTERVAL);
+
+
+            // Function to update the UI based on playback state
+            function updatePlayerUI() {
+                logo.classList.toggle('playing-animation', isPlaying);
+                equalizer.classList.toggle('active', isPlaying);
+                statusText.textContent = isPlaying ? 'Playing - Click logo to Pause' : 'Paused - Click logo to Play';
+                loadingStatusText.classList.add('hidden'); // Hide loading message
+            }
+
+            // Function to handle loading state
+            function showLoading() {
+                isLoading = true;
+                loadingStatusText.classList.remove('hidden');
+                statusText.textContent = 'Preparing stream...';
+                logo.classList.remove('playing-animation'); // Stop spin during loading
+                equalizer.classList.remove('active');
+            }
+
+            // Function to hide loading state
+            function hideLoading() {
+                isLoading = false;
+                loadingStatusText.classList.add('hidden');
+            }
+
+            function togglePlayPause() {
+                if (isLoading) {
+                    return; // Prevent interaction if already loading
+                }
+
+                if (isPlaying) {
+                    audioPlayer.pause();
+                } else {
+                    showLoading();
+                    const playPromise = audioPlayer.play();
+
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            // Playback started successfully, update UI
+                            isPlaying = true;
+                            hideLoading();
+                            updatePlayerUI();
+                        }).catch(error => {
+                            // Autoplay was prevented or other error
+                            console.error("Playback error:", error);
+                            statusText.textContent = 'Error playing. Click to try again.';
+                            isPlaying = false;
+                            hideLoading();
+                            updatePlayerUI(); // Update UI to reflect paused state
+                        });
+                    }
+                }
+            }
+
+            // Event Listeners
+            logoContainer.addEventListener('click', togglePlayPause);
+
+            // Allow keyboard activation for accessibility
+            logoContainer.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault(); // Prevent default scroll for spacebar
+                    togglePlayPause();
+                }
+            });
+
+            audioPlayer.addEventListener('play', () => {
+                isPlaying = true;
+                hideLoading();
+                updatePlayerUI();
+            });
+
+            audioPlayer.addEventListener('pause', () => {
+                isPlaying = false;
+                hideLoading();
+                updatePlayerUI();
+            });
+
+            audioPlayer.addEventListener('waiting', () => {
+                // Audio is buffering or waiting for data
+                showLoading();
+            });
+
+            audioPlayer.addEventListener('playing', () => {
+                // Audio started playing after buffering
+                isPlaying = true;
+                hideLoading();
+                updatePlayerUI();
+            });
+
+            audioPlayer.addEventListener('ended', () => {
+                // Stream ended (unlikely for a live stream, but good to handle)
+                isPlaying = false;
+                hideLoading();
+                updatePlayerUI();
+                statusText.textContent = 'Stream ended. Click to restart.';
+            });
+
+            audioPlayer.addEventListener('error', (e) => {
+                isPlaying = false;
+                hideLoading();
+                updatePlayerUI();
+                let errorMessage = 'Error loading stream. Please try again.';
+                console.error("Audio error event:", e);
+
+                switch (e.target.error.code) {
+                    case e.target.error.MEDIA_ERR_ABORTED:
+                        errorMessage = 'Audio playback aborted.';
+                        break;
+                    case e.target.error.MEDIA_ERR_NETWORK:
+                        errorMessage = 'Network error. Check your connection.';
+                        break;
+                    case e.target.error.MEDIA_ERR_DECODE:
+                        errorMessage = 'Audio decoding error.';
+                        break;
+                    case e.target.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                        errorMessage = 'Stream not supported or found.';
+                        break;
+                    default:
+                        break;
+                }
+                statusText.textContent = errorMessage;
+            });
+        });
+    </script>
+</body>
+</html>
